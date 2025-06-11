@@ -2,11 +2,13 @@ const express = require("express");
 const multer = require("multer");
 const nodemailer = require("nodemailer");
 const fs = require("fs");
+const cors = require("cors");
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
+app.use(cors()); // <-- Important for frontend-backend communication
 app.use(express.static(__dirname));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -41,13 +43,8 @@ app.post("/send-single", upload.single("attachment"), async (req, res) => {
       from: smtpUser,
       to: toEmail,
       subject: subject,
+      ...(sendAs === "text" ? { text: textContent } : { html: htmlTemplate })
     };
-
-    if (sendAs === "text") {
-      mailOptions.text = textContent;
-    } else {
-      mailOptions.html = htmlTemplate;
-    }
 
     if (attachment) {
       mailOptions.attachments = [
@@ -62,7 +59,7 @@ app.post("/send-single", upload.single("attachment"), async (req, res) => {
 
     if (attachment) {
       fs.unlink(attachment.path, err => {
-        if (err) console.error("Failed to delete temp file:", err);
+        if (err) console.error("Failed to delete file:", err);
       });
     }
 
@@ -70,7 +67,7 @@ app.post("/send-single", upload.single("attachment"), async (req, res) => {
   } catch (error) {
     if (attachment) {
       fs.unlink(attachment.path, err => {
-        if (err) console.error("Failed to delete temp file:", err);
+        if (err) console.error("Failed to delete file:", err);
       });
     }
     res.json({ success: false, error: error.message });
@@ -78,5 +75,5 @@ app.post("/send-single", upload.single("attachment"), async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
