@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bulk Email Sender</title>
+  <style>
+    body { font-family: Arial; padding: 20px; max-width: 700px; margin: auto; }
+    textarea, input, select { width: 100%; margin-bottom: 10px; padding: 8px; font-size: 14px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin-right: 10px; }
+    label { font-weight: bold; display: block; margin-top: 10px; }
+    .status { margin-bottom: 5px; }
+    .success { color: green; }
+    .fail { color: red; }
+    .tags { font-size: 16px; color: gray; margin-top: -8px; margin-bottom: 10px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Bulk Email Sender</h2>
+
+  <label>SMTP Host:</label>
+  <input type="text" id="smtpHost" placeholder="smtp.gmail.com" required />
+
+  <label>SMTP Port:</label>
+  <input type="text" id="smtpPort" placeholder="465 or 587" required />
+
+  <label>SMTP User:</label>
+  <input type="text" id="smtpUser" placeholder="you@example.com" required />
+
+  <label>SMTP Password (App Password):</label>
+  <input type="password" id="smtpPass" required />
+
+  <label>Subject:</label>
+  <input type="text" id="subject" placeholder="Enter your subject line with tags like #price, #email..." required />
+
+  <label>
+    <input type="radio" name="mode" value="text" checked onchange="toggleMode()"> Plain Text
+  </label>
+  <label>
+    <input type="radio" name="mode" value="html" onchange="toggleMode()"> HTML Template
+  </label>
+
+  <div id="textArea">
+    <label>Plain Text Body:</label>
+    <br></br>
+    <div class="tags">Available tags: #price, #number, #rantext, #email</div>
+    <textarea id="textContent" rows="6" placeholder="Write your email"></textarea>
+  </div>
+
+  <div id="htmlArea" style="display:none;">
+    <label>HTML Template:</label>
+    <br></br>
+    <div class="tags">Available tags: #price, #number, #rantext, #email</div>
+    <textarea id="htmlTemplate" rows="6" placeholder="<h1> Hello </h1>"></textarea>
+  </div>
+
+  <label>Bulk Emails (one per line): <span id="emailCount">0</span> emails</label>
+  <textarea id="bulkEmails" rows="10" placeholder="email1@example.com&#10;email2@example.com"></textarea>
+
+  <label>Attachment (optional):</label>
+  <input type="file" id="attachment" />
+
+  <button onclick="sendEmails()">Send Emails</button>
+  <button onclick="startSending()">Push</button>
+  <button onclick="stopSending()">Stop</button>
+
+  <h3>Status:</h3>
+  <div id="statusDisplay"></div>
+
+  <script>
+    let emailQueue = [];
+    let sending = false;
+    let logEntries = [];
+
+    function toggleMode() {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      document.getElementById('textArea').style.display = mode === 'text' ? 'block' : 'none';
+      document.getElementById('htmlArea').style.display = mode === 'html' ? 'block' : 'none';
+    }
+
+    document.getElementById("bulkEmails").addEventListener("input", function() {
+      const lines = this.value.split("\n").filter(e => e.trim()).length;
+      document.getElementById("emailCount").innerText = lines;
+    });
+
+    function replaceTags(content, email) {
+      const price = (Math.random() * (999.99 - 580.99) + 580.99).toFixed(2) + '$';
+      const number = Math.floor(1000000 + Math.random() * 9000000);
+      const rantext = Math.random().toString(36).substring(2, 14).toUpperCase();
+      return content
+        .replace(/#price/g, price)
+        .replace(/#number/g, number)
+        .replace(/#rantext/g, rantext)
+        .replace(/#email/g, email);
+    }
+
+    async function sendNext() {
+      if (!sending || emailQueue.length === 0) {
+        downloadLog();
+        return;
+      }
+
+      const email = emailQueue.shift();
+      const statusDiv = document.getElementById('statusDisplay');
+      statusDiv.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = 'status';
+      div.innerText = `${email} - Sending...`;
+      statusDiv.appendChild(div);
+
+      const subject = replaceTags(document.getElementById('subject').value, email);
+      const text = replaceTags(document.getElementById('textContent').value, email);
+      const html = replaceTags(document.getElementById('htmlTemplate').value, email);
+
+      const formData = new FormData();
+      formData.append('smtpHost', document.getElementById('smtpHost').value);
+      formData.append('smtpPort', document.getElementById('smtpPort').value);
+      formData.append('smtpUser', document.getElementById('smtpUser').value);
+      formData.append('smtpPass', document.getElementById('smtpPass').value);
+      formData.append('subject', subject);
+      formData.append('sendAs', document.querySelector('input[name="mode"]:checked').value);
+      formData.append('toEmail', email);
+
+      const fileInput = document.getElementById('attachment');
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const randomName = Math.random().toString(36).substring(2, 12).toUpperCase();
+        const blob = file.slice();
+        const renamedFile = new File([blob], `${randomName}${file.name.slice(file.name.lastIndexOf('.'))}`, { type: file.type });
+        formData.append('attachment', renamedFile);
+      }
+
+      if (document.querySelector('input[name="mode"]:checked').value === 'text') {
+        formData.append('textContent', text);
+      } else {
+        formData.append('htmlTemplate', html);
+      }
+
+      try {
+        const response = await fetch('/send-single', { method: 'POST', body: formData });
+        const result = await response.json();
+        if (result.success) {
+          div.innerHTML = `${email} - <span class="success">Sent ✅</span>`;
+          logEntries.push(`${email} - Sent`);
+        } else {
+          div.innerHTML = `${email} - <span class="fail">Failed ❌ (${result.error})</span>`;
+          logEntries.push(`${email} - Failed: ${result.error}`);
+        }
+      } catch (e) {
+        div.innerHTML = `${email} - <span class="fail">Error ❌ (${e.message})</span>`;
+        logEntries.push(`${email} - Error: ${e.message}`);
+      }
+
+      setTimeout(sendNext, 2000);
+    }
+
+    function sendEmails() {
+      emailQueue = document.getElementById('bulkEmails').value.split('\n').map(e => e.trim()).filter(Boolean);
+      sending = true;
+      sendNext();
+    }
+
+    function stopSending() {
+      sending = false;
+    }
+
+    function startSending() {
+      if (!sending && emailQueue.length > 0) {
+        sending = true;
+        sendNext();
+      }
+    }
+
+    function downloadLog() {
+      const blob = new Blob([logEntries.join("\n")], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const sender = document.getElementById('smtpUser').value.split('@')[0];
+      link.download = `${sender}_log.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
