@@ -29,7 +29,7 @@
   <input type="password" id="smtpPass" required />
 
   <label>Subject:</label>
-  <input type="text" id="subject" placeholder="Enter your subject line with tags like #price, #email..." required />
+  <input type="text" id="subject" placeholder="Enter subject line with tags like #price, #email..." required />
 
   <label>
     <input type="radio" name="mode" value="text" checked onchange="toggleMode()"> Plain Text
@@ -40,16 +40,14 @@
 
   <div id="textArea">
     <label>Plain Text Body:</label>
-    <br></br>
     <div class="tags">Available tags: #price, #number, #rantext, #email</div>
-    <textarea id="textContent" rows="6" placeholder="Write your email"></textarea>
+    <textarea id="textContent" rows="6" placeholder="Write your email..."></textarea>
   </div>
 
   <div id="htmlArea" style="display:none;">
     <label>HTML Template:</label>
-    <br></br>
     <div class="tags">Available tags: #price, #number, #rantext, #email</div>
-    <textarea id="htmlTemplate" rows="6" placeholder="<h1> Hello </h1>"></textarea>
+    <textarea id="htmlTemplate" rows="6" placeholder="<h1>Hello</h1>"></textarea>
   </div>
 
   <label>Bulk Emails (one per line): <span id="emailCount">0</span> emails</label>
@@ -100,7 +98,6 @@
 
       const email = emailQueue.shift();
       const statusDiv = document.getElementById('statusDisplay');
-      statusDiv.innerHTML = '';
       const div = document.createElement('div');
       div.className = 'status';
       div.innerText = `${email} - Sending...`;
@@ -122,10 +119,7 @@
       const fileInput = document.getElementById('attachment');
       if (fileInput.files.length > 0) {
         const file = fileInput.files[0];
-        const randomName = Math.random().toString(36).substring(2, 12).toUpperCase();
-        const blob = file.slice();
-        const renamedFile = new File([blob], `${randomName}${file.name.slice(file.name.lastIndexOf('.'))}`, { type: file.type });
-        formData.append('attachment', renamedFile);
+        formData.append('attachment', file);
       }
 
       if (document.querySelector('input[name="mode"]:checked').value === 'text') {
@@ -135,7 +129,10 @@
       }
 
       try {
-        const response = await fetch('/send-single', { method: 'POST', body: formData });
+        const response = await fetch('https://web-zdcn.onrender.com/send-single', {
+          method: 'POST',
+          body: formData
+        });
         const result = await response.json();
         if (result.success) {
           div.innerHTML = `${email} - <span class="success">Sent ✅</span>`;
