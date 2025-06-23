@@ -34,8 +34,8 @@ app.post("/send-single", upload.single("attachment"), async (req, res) => {
   const attachment = req.file;
 
   try {
-    // Wait 3 seconds before sending
-    await sleep(3000);
+    // Wait 4 seconds before sending
+    await sleep(4000);
 
     const transporter = nodemailer.createTransport({
       host: smtpHost,
