@@ -8,10 +8,15 @@ const app = express();
 const upload = multer({ dest: "uploads/" });
 const PORT = process.env.PORT || 3000;
 
-app.use(cors()); // <-- Important for frontend-backend communication
+app.use(cors());
 app.use(express.static(__dirname));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Delay function
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 app.post("/send-single", upload.single("attachment"), async (req, res) => {
   const {
@@ -29,6 +34,9 @@ app.post("/send-single", upload.single("attachment"), async (req, res) => {
   const attachment = req.file;
 
   try {
+    // Wait 3 seconds before sending
+    await sleep(3000);
+
     const transporter = nodemailer.createTransport({
       host: smtpHost,
       port: parseInt(smtpPort),
@@ -43,7 +51,7 @@ app.post("/send-single", upload.single("attachment"), async (req, res) => {
       from: smtpUser,
       to: toEmail,
       subject: subject,
-      ...(sendAs === "text" ? { text: textContent } : { html: htmlTemplate })
+      ...(sendAs === "text" ? { text: textContent } : { html: htmlTemplate }),
     };
 
     if (attachment) {
